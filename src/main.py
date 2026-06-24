@@ -1,78 +1,55 @@
-import os
 import sys
-from scanner import scan_recursive
+import os
 
-# ============ ПАРАМЕТРЫ ============
-
-# Значения по умолчанию
-path = os.getcwd()
-ext = None
-min_size = None
-
-# Разбираем команду
-args = sys.argv[1:]
-i = 0
-
-while i < len(args):
-    if args[i] == '-h':
-        print("\n📁 СКАНЕР ФАЙЛОВ")
-        print("  python main.py [ПАПКА] [-e .py] [-s 1]")
-        print("\n  -e .py   фильтр по расширению")
-        print("  -s 1     минимальный размер в МБ")
-        print("  -h       справка")
-        sys.exit(0)
+def check_arguments():
+    # Проверяем наличие аргумента командной строки
+    if len(sys.argv) < 2:
+        print("Ошибка: Не указан путь к папке.")
+        print("Использование: python script.py <путь_к_папке>")
+        sys.exit(1)
+        
+    target_path = sys.argv[1]
     
-    elif args[i] == '-e':
-        ext = args[i + 1]
-        i += 2
+    # Проверяем существование пути и что это директория
+    if not os.path.exists(target_path):
+        print(f"Ошибка: Путь '{target_path}' не существует.")
+        sys.exit(1)
+        
+    if not os.path.isdir(target_path):
+        print(f"Ошибка: Путь '{target_path}' не является папкой.")
+        sys.exit(1)
+        
+    return target_path
+
+def scan_directory(current_dir, depth=0):
+    try:
+        # Получаем список всех элементов в текущей папке
+        items = os.listdir(current_dir)
+    except PermissionError:
+        # Обрабатываем папки, к которым нет доступа
+        indent = "  " * depth
+        print(f"{indent}[Доступ ограничен] {os.path.basename(current_dir)}")
+        return
+
+    for item in items:
+        # Создаем полный путь к элементу
+        full_path = os.path.join(current_dir, item)
+        indent = "  " * depth
+        
+        if os.path.isdir(full_path):
+            # Если это папка, выводим её имя и заходим внутрь 
+            print(f"{indent} {item}/")
+            scan_directory(full_path, depth + 1)
+        else:
+            print(f"{indent} {item}")
+
+def main():
+    # Этап 1: Проверка запуска и аргументов
+    folder_to_scan = check_arguments()
+    print(f"Старт анализа папки: {folder_to_scan}\n")
     
-    elif args[i] == '-s':
-        min_size = float(args[i + 1])
-        i += 2
-    
-    else:
-        if os.path.isdir(args[i]):
-            path = args[i]
-        i += 1
+    # Этап 2: Рекурсивный обход и вывод структуры
+    scan_directory(folder_to_scan)
 
-# ============ СКАНИРУЕМ ============
-
-print(f"\n📁 Папка: {path}")
-files = scan_recursive(path)
-print(f"✅ Найдено: {len(files)} файлов")
-
-# ============ ФИЛЬТРЫ ============
-
-if ext:
-    if not ext.startswith('.'):
-        ext = '.' + ext
-    files = [f for f in files if f['path'].lower().endswith(ext.lower())]
-    print(f"🔍 Фильтр {ext}: {len(files)} файлов")
-
-if min_size:
-    min_bytes = min_size * 1024 * 1024
-    files = [f for f in files if f['size'] >= min_bytes]
-    print(f"🔍 Фильтр > {min_size} МБ: {len(files)} файлов")
-
-# ============ ВЫВОД ============
-
-if not files:
-    print("❌ Файлов нет")
-    sys.exit(0)
-
-# Сортируем по размеру
-files.sort(key=lambda x: x['size'], reverse=True)
-
-print("\n" + "=" * 60)
-print(f"{'№':<4} {'МБ':<8} {'Имя файла'}")
-print("=" * 60)
-
-for i, f in enumerate(files[:20], 1):
-    name = os.path.basename(f['path'])
-    mb = f['size'] / (1024 * 1024)
-    print(f"{i:<4} {mb:<8.2f} {name}")
-
-print("=" * 60)
-
-total_mb = sum(f['size'] for f in files) / (1024 * 1024)
-print(f"\n📊 Всего: {len(files)} файлов, {total_mb:.2f} МБ")
+if __name__ == "__main__":
+    main()

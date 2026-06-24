@@ -1,7 +1,9 @@
 import os
 
 def scan_recursive(directory_path):
-    """Рекурсивный обход """
+    """
+    Рекурсивно обходит папку и собирает метаданные файлов.
+    """
     files_info = []
     
     try:
@@ -21,6 +23,6 @@ def scan_recursive(directory_path):
                 files_info.extend(scan_recursive(full_path))
                 
     except PermissionError:
-        print(f"Нет доступа к {directory_path}")
+        print(f"⚠️  Нет доступа к {directory_path}")
     
     return files_info
