@@ -1,73 +1,56 @@
-    import sys
-    import os
+import sys
+import os
+from scanner import scan_directory      
+from duplicate import extract_duplicates
+from reporter import print_duplicates_report, print_backup_compare_report
 
-    if sys.platform == "win32":
-        sys.stdout.reconfigure(encoding="utf-8")
-
-    from scanner import scan_directory
-    from reporter import print_duplicates_report
-    from comparator import compare_directories  
-
-    def check_arguments():
-        if len(sys.argv) < 3:
-            target_path = sys.argv[1] if len(sys.argv) == 2 else "."
-            
-            if not os.path.exists(target_path) or not os.path.isdir(target_path):
-                print(f"Ошибка: Путь '{target_path}' не существует или не является папкой.")
-                sys.exit(1)
-                
-            return "duplicates", target_path, None
-        else:
-            source_path = sys.argv[1]
-            backup_path = sys.argv[2]
-            
-            for path, name in [(source_path, "Исходная папка"), (backup_path, "Папка бэкапа")]:
-                if not os.path.exists(path) or not os.path.isdir(path):
-                    print(f"Ошибка: {name} '{path}' не существует или не является директорией.")
-                    sys.exit(1)
-                    
-            return "compare", source_path, backup_path
-
-    def main():
-        mode, path1, path2 = check_arguments()
+def check_arguments():
+    if len(sys.argv) < 2 or len(sys.argv) > 3:
+        print("Использование для дубликатов: python main.py [папка] [расширение]")
+        print("Использование для бэкапа:     python main.py [папка_источник] [папка_бэкап]")
+        sys.exit(1)
         
-        if mode == "duplicates":
-            print(f"Старт анализа папки: {path1}")
-            print("-" * 30)
-            results = scan_directory(path1)
-            print_duplicates_report(results)
-            
-        elif mode == "compare":
-            print(f"Старт сравнения директорий...")
-            print(f"Источник: {path1}")
-            print(f"Бэкап:    {path2}")
-            print("-" * 50)
-            
-            missing, modified, extra = compare_directories(path1, path2)
-            
-            print("\n" + "=" * 50)
-            print("                 ОТЧЕТ О РАЗЛИЧИЯХ")
-            print("=" * 50)
-            
-            print(f"\n ОТСУТСТВУЮТ В БЭКАПЕ (Всего: {len(missing)}):")
-            if missing:
-                for f in sorted(missing): print(f"  - {f}")
-            else:
-                print("  (нет отсутствующих файлов)")
-                
-            print(f"\n️ ИЗМЕНЕННЫЕ ФАЙЛЫ (Всего: {len(modified)}):")
-            if modified:
-                for f in sorted(modified): print(f"  - {f}")
-            else:
-                print("  (нет измененных файлов)")
-                
-            print(f"\n ЛИШНИЕ ФАЙЛЫ В БЭКАПЕ (Всего: {len(extra)}):")
-            if extra:
-                for f in sorted(extra): print(f"  - {f}")
-            else:
-                print("  (нет лишних файлов)")
-                
-            print("\n" + "=" * 50)
+    return sys.argv[1:]
 
-    if __name__ == "__main__":
-        main()
+def main():
+    args = check_arguments()
+    
+    # Сравнение исходной папки и бэкапа (
+    if len(args) == 2 and os.path.isdir(args[0]) and os.path.isdir(args[1]):
+        source_dir, backup_dir = args[0], args[1]
+        
+        print(f"Старт анализа источника: {source_dir}")
+        source_raw = scan_directory(source_dir)
+        
+        print(f"\nСтарт анализа бэкапа: {backup_dir}")
+        backup_raw = scan_directory(backup_dir)
+        
+        print_backup_compare_report(source_raw, backup_raw, source_dir, backup_dir)
+        
+    # Поиск дубликатов 
+    else:
+        path = args[0]
+        extension = args[1] if len(args) == 2 else None
+    
+        if extension:
+    if extension in [".", "/.", ""]:
+        extension = None
+    else:
+        if not extension.startswith("."):
+            extension = "." + extension
+        
+        if not os.path.isdir(path):
+            print(f"Ошибка: Путь {path} не существует или не является папкой.")
+            sys.exit(1)
+            
+        print(f"Старт анализа папки: {path}")
+        if extension:
+            print(f"Фильтр по расширению: {extension}")
+        print("-" * 30)
+
+        raw_results = scan_directory(path, extension=extension)
+        duplicates = extract_duplicates(raw_results)
+        print_duplicates_report(duplicates)
+
+if __name__ == "__main__":
+    main()
